@@ -20,8 +20,10 @@ paths:
 # Hub polls this Deployment for readiness (ready_replicas == replicas).
 deployment_name: ray-controller-deployment
 gateway:
-  name: ray-gateway
-  class: gke-l7-gxlb   # filter-free route; dashboard via its own LoadBalancer
+  # Modern class -> a DEDICATED external LB per Gateway (the classic gke-l7-gxlb
+  # shares one LB per cluster, which collides with other features' routes).
+  name: ray-render-gw
+  class: gke-l7-global-external-managed
 
 # Single image: Ray runtime + the tile task module + the FastAPI controller.
 # Used for the controller Deployment AND the RayCluster head/worker pods, so the

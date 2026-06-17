@@ -3,13 +3,14 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: ray-gateway
+  name: ray-render-gw
   namespace: ${NAMESPACE}
 spec:
-  # Classic global external ALB. It does NOT support HTTPRoute rule filters, so
-  # the route is filter-free (the Ray dashboard is exposed via its own
-  # LoadBalancer Service instead — see dashboard-service.yaml).
-  gatewayClassName: gke-l7-gxlb
+  # Modern global external ALB: a DEDICATED load balancer per Gateway. (The
+  # classic gke-l7-gxlb shares one "external-http-gateway" LB per cluster, which
+  # collides with other features' routes on a shared cluster.) The Ray dashboard
+  # is exposed via its own LoadBalancer Service (dashboard-service.yaml).
+  gatewayClassName: gke-l7-global-external-managed
   listeners:
     - name: http
       protocol: HTTP

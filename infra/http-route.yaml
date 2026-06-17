@@ -10,7 +10,7 @@ metadata:
   namespace: ${NAMESPACE}
 spec:
   parentRefs:
-    - name: ray-gateway
+    - name: ray-render-gw
   rules:
     - matches:
         - path:

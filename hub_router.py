@@ -41,7 +41,7 @@ except Exception:  # standalone / unit tests
     _get_feature_namespace = None
 
 FEATURE = "ray"
-GATEWAY_NAME = "ray-gateway"
+GATEWAY_NAME = "ray-render-gw"
 
 router = APIRouter()
 

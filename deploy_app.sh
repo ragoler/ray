@@ -82,6 +82,10 @@ if [ "${RESET_GW}" = true ] || { [ -n "${CUR_GW_CLASS}" ] && [ "${CUR_GW_CLASS}"
   force_delete_gateway "${GATEWAY_NAME}"
 fi
 
+# One-time migration: remove the legacy classic gxlb gateway (replaced by the
+# dedicated modern gateway). No-op once it's gone.
+[ "${GATEWAY_NAME}" != "ray-gateway" ] && force_delete_gateway "ray-gateway"
+
 # Variables the infra manifests reference.
 export NAMESPACE RAY_IMAGE WORKER_MIN_REPLICAS WORKER_MAX_REPLICAS
 for f in "${ROOT}"/infra/*.yaml; do
@@ -95,13 +99,13 @@ kubectl -n "${NAMESPACE}" rollout restart deployment/ray-controller-deployment
 kubectl -n "${NAMESPACE}" rollout status deployment/ray-controller-deployment --timeout=600s || true
 
 echo "=== Deployed. Discovering Gateway IP (may take 3-5 minutes) ==="
-# gke-l7-gxlb sometimes doesn't report its IP in the Gateway status; fall back to
-# the GCP forwarding rule (the class names it <namespace>-external-http-gateway).
+# Prefer the Gateway status; fall back to the GCP forwarding rule (named after the
+# gateway: gkegw1-<hash>-<namespace>-<gateway-name>-<hash>).
 gateway_ip() {
   local ip
   ip=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
   [ -z "${ip}" ] && ip=$(gcloud compute forwarding-rules list --global --project="${PROJECT_ID}" \
-    --filter="name~gkegw1.*-${NAMESPACE}-external-http-gateway" --format="value(IPAddress)" 2>/dev/null | head -1)
+    --filter="name~gkegw1.*-${NAMESPACE}-${GATEWAY_NAME}" --format="value(IPAddress)" 2>/dev/null | head -1)
   echo "${ip}"
 }
 for i in {1..30}; do
