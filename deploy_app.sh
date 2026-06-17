@@ -44,7 +44,9 @@ echo "=== Pushing image ==="
 docker push "${RAY_IMAGE}"
 
 echo "=== Deploying per-namespace infra into: ${NAMESPACE} ==="
-kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+# Create the namespace only if missing (avoids the kubectl-apply annotation
+# warning on pre-existing namespaces like "default").
+kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${NAMESPACE}"
 
 # Variables the infra manifests reference.
 export NAMESPACE RAY_IMAGE WORKER_MIN_REPLICAS WORKER_MAX_REPLICAS
