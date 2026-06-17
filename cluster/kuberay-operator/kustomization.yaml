@@ -5,6 +5,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Pin the operator to its own namespace deterministically. Upstream's default
+# kustomization sets the namespace itself (v1.2.2 -> ray-system, v1.4.0 ->
+# default); overriding it here keeps a single, predictable operator location
+# across version bumps (and matches setup_infra.sh's readiness wait). The
+# ray-system namespace must exist first — setup_infra.sh creates it.
+namespace: ray-system
+
 # v1.4.0 uses modern kustomize fields (resources/labels), avoiding the deprecated
 # bases/commonLabels warnings that v1.2.2 emitted. Compatible with ray.io/v1 and
 # the Ray 2.40.0 image used by the head/worker pods.
