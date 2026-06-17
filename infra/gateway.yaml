@@ -6,7 +6,10 @@ metadata:
   name: ray-gateway
   namespace: ${NAMESPACE}
 spec:
-  gatewayClassName: gke-l7-gxlb
+  # Global external ALB (GFEv3). Required because our HTTPRoute uses a URLRewrite
+  # filter for the /ray-dashboard route — the classic gke-l7-gxlb class rejects
+  # rule filters (GWCER104).
+  gatewayClassName: gke-l7-global-external-managed
   listeners:
     - name: http
       protocol: HTTP

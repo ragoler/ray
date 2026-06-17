@@ -48,6 +48,15 @@ echo "=== Deploying per-namespace infra into: ${NAMESPACE} ==="
 # warning on pre-existing namespaces like "default").
 kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${NAMESPACE}"
 
+# gatewayClassName is immutable; if it changed, recreate the Gateway (its IP
+# will change). No-op on first deploy or when the class is unchanged.
+DESIRED_GW_CLASS=$(grep -m1 'gatewayClassName:' "${ROOT}/infra/gateway.yaml" | awk '{print $2}')
+CUR_GW_CLASS=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.spec.gatewayClassName}' 2>/dev/null || true)
+if [ -n "${CUR_GW_CLASS}" ] && [ "${CUR_GW_CLASS}" != "${DESIRED_GW_CLASS}" ]; then
+  echo "Gateway class changed (${CUR_GW_CLASS} -> ${DESIRED_GW_CLASS}); recreating Gateway."
+  kubectl -n "${NAMESPACE}" delete gateway "${GATEWAY_NAME}" --ignore-not-found
+fi
+
 # Variables the infra manifests reference.
 export NAMESPACE RAY_IMAGE WORKER_MIN_REPLICAS WORKER_MAX_REPLICAS
 for f in "${ROOT}"/infra/*.yaml; do
