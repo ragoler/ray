@@ -1,0 +1,20 @@
+# Tell the Gateway load balancer to health-check the controller at /healthz.
+# Without this, the backend health check defaults to "/" (which the controller
+# doesn't serve -> 404 -> backend marked unhealthy -> 502s, and the Gateway never
+# reports Programmed/an address).
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: ray-controller-hc
+  namespace: ${NAMESPACE}
+spec:
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /healthz
+        port: 8000
+  targetRef:
+    group: ""
+    kind: Service
+    name: ray-controller

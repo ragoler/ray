@@ -20,8 +20,17 @@ kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
   -l ray.io/cluster=ray-render-farm,ray.io/node-type=head --timeout=600s
 
 echo "=== Discovering Gateway IP ==="
+# gke-l7-gxlb may not report its IP in the Gateway status; fall back to the GCP
+# forwarding rule (named <namespace>-external-http-gateway for this class).
+gateway_ip() {
+  local ip
+  ip=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
+  [ -z "${ip}" ] && ip=$(gcloud compute forwarding-rules list --global --project="${PROJECT_ID}" \
+    --filter="name~gkegw1.*-${NAMESPACE}-external-http-gateway" --format="value(IPAddress)" 2>/dev/null | head -1)
+  echo "${ip}"
+}
 for i in {1..30}; do
-  GATEWAY_IP=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
+  GATEWAY_IP=$(gateway_ip)
   [ -n "${GATEWAY_IP}" ] && break
   sleep 10
 done
