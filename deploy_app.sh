@@ -17,6 +17,17 @@ REGION="${REGION:-${ZONE%-*}}"
 NAMESPACE="${NAMESPACE:-default}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# --reset-gateway: delete the Gateway + HTTPRoute before applying, forcing the
+# GKE controller to reconcile them fresh. Use this if the Gateway is wedged
+# (e.g. stuck "Waiting for controller" after a class change left a stale route).
+RESET_GW=false
+case "${1:-}" in
+  --reset-gateway) RESET_GW=true ;;
+  -h|--help)       echo "Usage: $0 [--reset-gateway]"; exit 0 ;;
+  "")              ;;
+  *) echo "Unknown argument: $1 (use --reset-gateway or no flag)"; exit 1 ;;
+esac
+
 # Per-cluster image tag so multiple clusters never clobber each other's image.
 IMAGE_TAG="${IMAGE_TAG:-${CLUSTER_NAME}}"
 REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}"
@@ -48,12 +59,15 @@ echo "=== Deploying per-namespace infra into: ${NAMESPACE} ==="
 # warning on pre-existing namespaces like "default").
 kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${NAMESPACE}"
 
-# gatewayClassName is immutable; if it changed, recreate the Gateway (its IP
-# will change). No-op on first deploy or when the class is unchanged.
+# Recreate the Gateway + HTTPRoute together when needed. gatewayClassName is
+# immutable, and recreating the Gateway alone while re-applying an unchanged
+# HTTPRoute leaves the route's status stale -> the Gateway never programs. So
+# whenever we recreate the Gateway, recreate the route too (fresh reconcile).
 DESIRED_GW_CLASS=$(grep -m1 'gatewayClassName:' "${ROOT}/infra/gateway.yaml" | awk '{print $2}')
 CUR_GW_CLASS=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.spec.gatewayClassName}' 2>/dev/null || true)
-if [ -n "${CUR_GW_CLASS}" ] && [ "${CUR_GW_CLASS}" != "${DESIRED_GW_CLASS}" ]; then
-  echo "Gateway class changed (${CUR_GW_CLASS} -> ${DESIRED_GW_CLASS}); recreating Gateway."
+if [ "${RESET_GW}" = true ] || { [ -n "${CUR_GW_CLASS}" ] && [ "${CUR_GW_CLASS}" != "${DESIRED_GW_CLASS}" ]; }; then
+  echo "Recreating Gateway + HTTPRoute for a clean reconcile (its IP will change)."
+  kubectl -n "${NAMESPACE}" delete httproute ray-route --ignore-not-found
   kubectl -n "${NAMESPACE}" delete gateway "${GATEWAY_NAME}" --ignore-not-found
 fi
 
