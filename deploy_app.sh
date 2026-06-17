@@ -94,7 +94,14 @@ fi
 # Variables the infra manifests reference.
 export NAMESPACE RAY_IMAGE WORKER_MIN_REPLICAS WORKER_MAX_REPLICAS
 for f in "${ROOT}"/infra/*.yaml; do
-  echo "    applying $(basename "$f")"
+  base=$(basename "$f")
+  # PodMonitoring needs the Managed Prometheus CRD; skip if GMP isn't enabled yet.
+  if [ "${base}" = "podmonitoring.yaml" ] && \
+     ! kubectl get crd podmonitorings.monitoring.googleapis.com >/dev/null 2>&1; then
+    echo "    skipping ${base} (Managed Prometheus not enabled — run ./setup_infra.sh)"
+    continue
+  fi
+  echo "    applying ${base}"
   render "$f" | kubectl apply -n "${NAMESPACE}" -f -
 done
 

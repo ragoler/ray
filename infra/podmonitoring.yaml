@@ -1,0 +1,20 @@
+# Google Managed Prometheus (GMP) scrape config for Ray. GMP's managed collection
+# (enabled on the cluster by setup_infra.sh) discovers this PodMonitoring and
+# scrapes every Ray pod's Prometheus endpoint (the `metrics` port / :8080 /metrics),
+# shipping ray_* metrics to Cloud Monitoring with no self-managed Prometheus.
+# See: https://cloud.google.com/stackdriver/docs/managed-prometheus/exporters/kuberay
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: ray-metrics
+  namespace: ${NAMESPACE}
+  labels:
+    app: ray-render-farm
+spec:
+  selector:
+    matchLabels:
+      ray.io/cluster: ray-render-farm
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

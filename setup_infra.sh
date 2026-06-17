@@ -78,6 +78,7 @@ else
     --machine-type="${MACHINE_TYPE}" \
     --num-nodes="${NUM_NODES}" \
     --gateway-api=standard \
+    --enable-managed-prometheus \
     --enable-autoprovisioning \
     --min-cpu 0 --max-cpu "${MAX_CPU:-200}" \
     --min-memory 0 --max-memory "${MAX_MEMORY:-800}"
@@ -85,6 +86,12 @@ fi
 
 echo "=== Step 2: Getting cluster credentials ==="
 gcloud container clusters get-credentials "${CLUSTER_NAME}" --project="${PROJECT_ID}" --zone="${ZONE}"
+
+# Ensure Google Managed Prometheus is on (idempotent — also covers pre-existing
+# clusters created before this flag, so the PodMonitoring CRD exists for deploy).
+echo "=== Step 2b: Ensuring Managed Prometheus (GMP) is enabled ==="
+gcloud container clusters update "${CLUSTER_NAME}" --project="${PROJECT_ID}" --zone="${ZONE}" \
+  --enable-managed-prometheus 2>/dev/null || echo "Managed Prometheus already enabled (or update skipped)."
 
 # --- Step 3: KubeRay operator (pinned kustomize) --------------------------
 echo "=== Step 3: Installing the KubeRay operator (cluster-scoped, pinned) ==="

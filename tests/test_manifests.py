@@ -115,6 +115,35 @@ def test_dashboard_loadbalancer_service():
     assert svc["spec"]["ports"][0]["targetPort"] == 8265
 
 
+def test_metrics_observability_manifests():
+    """Ray exposes a named metrics port and GMP PodMonitoring scrapes it."""
+    rc = None
+    for doc in yaml.safe_load_all((INFRA / "raycluster.yaml").read_text()):
+        if doc and doc.get("kind") == "RayCluster":
+            rc = doc
+    head = rc["spec"]["headGroupSpec"]["template"]["spec"]["containers"][0]
+    assert any(p.get("name") == "metrics" for p in head["ports"])
+
+    pm = None
+    for doc in yaml.safe_load_all((INFRA / "podmonitoring.yaml").read_text()):
+        if doc and doc.get("kind") == "PodMonitoring":
+            pm = doc
+    assert pm is not None
+    assert pm["spec"]["selector"]["matchLabels"]["ray.io/cluster"] == "ray-render-farm"
+    assert pm["spec"]["endpoints"][0]["port"] == "metrics"
+
+
+def test_backend_policy_extends_sse_timeout():
+    """A GCPBackendPolicy raises the controller backend timeout above the 30s default."""
+    bp = None
+    for doc in yaml.safe_load_all((INFRA / "backend-policy.yaml").read_text()):
+        if doc and doc.get("kind") == "GCPBackendPolicy":
+            bp = doc
+    assert bp is not None
+    assert bp["spec"]["default"]["timeoutSec"] >= 600
+    assert bp["spec"]["targetRef"]["name"] == "ray-controller"
+
+
 def test_raycluster_autoscaling_and_spot():
     rc = None
     for doc in yaml.safe_load_all((INFRA / "raycluster.yaml").read_text()):

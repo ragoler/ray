@@ -1,0 +1,15 @@
+# Raise the Gateway backend timeout for the controller. The default (30s) cuts
+# the render SSE stream during a cold start (while KubeRay provisions Spot nodes),
+# which the browser surfaces as "Network Error". 1h comfortably covers it.
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: ray-controller-timeout
+  namespace: ${NAMESPACE}
+spec:
+  default:
+    timeoutSec: 3600
+  targetRef:
+    group: ""
+    kind: Service
+    name: ray-controller

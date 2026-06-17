@@ -95,6 +95,28 @@ itself. As a Hub feature none of these scripts run — the Hub discovers
 at bootstrap and `infra/` per deploy (into `gke-showcase-ray`), and serves the
 playroom at `/ray/`.
 
+## Metrics — Google Managed Prometheus (GMP)
+
+Ray exports Prometheus metrics on each pod (`metrics` port `:8080/metrics`). The
+RayCluster exposes that port, and [`infra/podmonitoring.yaml`](infra/podmonitoring.yaml)
+tells **GMP's managed collection** (enabled on the cluster by `setup_infra.sh`
+via `--enable-managed-prometheus`) to scrape every Ray pod — no self-managed
+Prometheus. This follows the
+[KubeRay GMP exporter guide](https://cloud.google.com/stackdriver/docs/managed-prometheus/exporters/kuberay).
+
+View the metrics in **Cloud Console → Monitoring → Metrics Explorer** (PromQL mode):
+
+```promql
+ray_node_cpu_utilization
+sum(ray_tasks{State="RUNNING"})
+ray_cluster_active_nodes
+```
+
+> The **Ray Dashboard's own "Metrics" tab** additionally needs Grafana +
+> `RAY_PROMETHEUS_HOST`/`RAY_GRAFANA_HOST` on the head. That's a further step
+> (deploy the GMP query frontend + Grafana); GMP collection above is independent
+> and works on its own via Cloud Monitoring.
+
 ## Tests
 
 ```bash

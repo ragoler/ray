@@ -21,6 +21,7 @@ spec:
     rayStartParams:
       dashboard-host: "0.0.0.0"     # serve the dashboard for the Gateway route
       num-cpus: "0"                 # keep tasks on workers so fan-out is visible
+      metrics-export-port: "8080"   # Prometheus metrics (scraped by GMP)
     template:
       spec:
         containers:
@@ -34,13 +35,15 @@ spec:
               - { containerPort: 6379, name: gcs }
               - { containerPort: 8265, name: dashboard }
               - { containerPort: 10001, name: client }
+              - { containerPort: 8080, name: metrics }
 
   workerGroupSpecs:
     - groupName: spot-workers
       replicas: ${WORKER_MIN_REPLICAS}
       minReplicas: ${WORKER_MIN_REPLICAS}
       maxReplicas: ${WORKER_MAX_REPLICAS}
-      rayStartParams: {}
+      rayStartParams:
+        metrics-export-port: "8080"   # Prometheus metrics (scraped by GMP)
       template:
         spec:
           # Land workers on Spot capacity via the cluster-scoped ComputeClass.
@@ -62,6 +65,8 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
+              ports:
+                - { containerPort: 8080, name: metrics }
               resources:
                 requests: { cpu: "1", memory: 2Gi }
                 limits: { cpu: "2", memory: 4Gi }
