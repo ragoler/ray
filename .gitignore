@@ -6,9 +6,15 @@ venv/
 *.egg-info/
 .pytest_cache/
 
-# Local env / secrets
+# Local env / secrets (keep .env.example tracked)
 .env
+.env_*
 .env.local
+.envrc
+
+# Claude Code local state / agent files
+.claude/
+.claude
 
 # OS / editor
 .DS_Store

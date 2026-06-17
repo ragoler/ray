@@ -38,6 +38,10 @@ Browser ──/render──▶ Controller (Ray driver) ──ray://head:10001─
 | `hub_router.py` | thin Hub data-plane router + full MOCK mode |
 | `infra/` | per-namespace: RayCluster, controller, RBAC, Gateway, HTTPRoute |
 | `cluster/` | cluster-scoped: KubeRay operator (pinned) + Spot ComputeClass |
+| `.env.example` | standalone config template (`cp .env.example .env`) |
+| `setup_infra.sh` | standalone: create GKE cluster + cluster-scoped prereqs |
+| `deploy_app.sh` | standalone: build/push image + deploy `infra/` |
+| `verify_setup.sh` | standalone: readiness + data-plane smoke test |
 | `tests/` | unit + mock-mode tests |
 
 ## Run the playroom offline (MOCK)
@@ -54,15 +58,37 @@ open http://localhost:8080/ray/
 
 ## Standalone on GKE
 
+Three steps, mirroring the `inference_gateway` convention: configure, provision
+the cluster, deploy the app.
+
 ```bash
-export PROJECT_NAME=... REGION=us-central1 ARTIFACT_REGISTRY_REPO=...
-export NAMESPACE=default
-./setup_infra.sh           # operator + ComputeClass, build/push image, deploy infra
+# 1. Configure (edit PROJECT_ID, cluster name, region, worker cap, …)
+cp .env.example .env
+
+# 2. Provision: create the GKE cluster (Gateway API + Node Auto-Provisioning)
+#    and the cluster-scoped prereqs (KubeRay operator + Spot ComputeClass).
+./setup_infra.sh
+
+# 3. Build & push the image, then deploy the RayCluster + controller + Gateway.
+./deploy_app.sh
+
+# 4. Validate: readiness + a real render through the Gateway IP.
+./verify_setup.sh
 ```
 
-Then open the Gateway IP. As a Hub feature, none of this is needed — the Hub
-discovers `feature.yaml`, builds the image, applies `cluster/` once and `infra/`
-per deploy, and serves the playroom at `/ray/`.
+Teardown (the cluster is only removed with `--delete-cluster`):
+
+```bash
+./setup_infra.sh --delete          # remove cluster-scoped prereqs, keep cluster
+./setup_infra.sh --delete-cluster  # the above, plus delete the GKE cluster
+```
+
+Standalone uses **`PROJECT_ID`** (in `.env`); the Hub injects the equivalent as
+**`PROJECT_NAME`** and supplies `NAMESPACE`/`REGION`/`ARTIFACT_REGISTRY_REPO`
+itself. As a Hub feature none of these scripts run — the Hub discovers
+`feature.yaml`, builds the image from its `build:` entry, applies `cluster/` once
+at bootstrap and `infra/` per deploy (into `gke-showcase-ray`), and serves the
+playroom at `/ray/`.
 
 ## Tests
 
