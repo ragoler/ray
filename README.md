@@ -104,7 +104,12 @@ via `--enable-managed-prometheus`) to scrape every Ray pod — no self-managed
 Prometheus. This follows the
 [KubeRay GMP exporter guide](https://cloud.google.com/stackdriver/docs/managed-prometheus/exporters/kuberay).
 
-View the metrics in **Cloud Console → Monitoring → Metrics Explorer** (PromQL mode):
+`deploy_app.sh` also creates a curated **Cloud Monitoring dashboard** ("Ray Render
+Farm", from [`monitoring/ray-dashboard.json`](monitoring/ray-dashboard.json)) and
+stashes its URL in the `ray-links` ConfigMap, which the controller surfaces as the
+**"Metrics ↗"** button in the playroom (and the script prints the link too).
+
+Or query directly in **Cloud Console → Monitoring → Metrics Explorer** (PromQL):
 
 ```promql
 ray_node_cpu_utilization

@@ -1,0 +1,72 @@
+{
+  "displayName": "Ray Render Farm",
+  "mosaicLayout": {
+    "columns": 12,
+    "tiles": [
+      {
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Running Ray tasks",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": { "prometheusQuery": "sum(ray_tasks{State=\"RUNNING\"})" },
+                "plotType": "LINE"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Active Ray nodes (head + workers)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": { "prometheusQuery": "count(ray_node_cpu_utilization)" },
+                "plotType": "LINE"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "yPos": 4,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Per-node CPU utilization (%)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": { "prometheusQuery": "ray_node_cpu_utilization" },
+                "plotType": "LINE"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "yPos": 4,
+        "xPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Object store memory (bytes)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": { "prometheusQuery": "sum(ray_object_store_memory)" },
+                "plotType": "LINE"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

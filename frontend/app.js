@@ -15,6 +15,7 @@ const HUB_BASE = "/api/features/ray";
 const els = {
   mode: document.getElementById("mode-badge"),
   dash: document.getElementById("dashboard-btn"),
+  metrics: document.getElementById("metrics-btn"),
   preset: document.getElementById("preset"),
   resolution: document.getElementById("resolution"),
   maxIter: document.getElementById("max_iter"),
@@ -111,6 +112,22 @@ async function refreshDashboard() {
     if (url) {
       els.dash.href = url;
       els.dash.hidden = false;
+    }
+  } catch (_) {
+    /* not ready yet */
+  }
+}
+
+// Cloud Monitoring dashboard link (set by deploy into the ray-links ConfigMap).
+async function refreshMetrics() {
+  if (cfg.mode === "MOCK" || !els.metrics.hidden) return;
+  try {
+    const r = await fetch(`${cfg.dataBase}/metrics-link`, { headers: dataHeaders() });
+    if (!r.ok) return;
+    const { url } = await r.json();
+    if (url) {
+      els.metrics.href = url;
+      els.metrics.hidden = false;
     }
   } catch (_) {
     /* not ready yet */
@@ -279,5 +296,6 @@ els.launch.addEventListener("click", runRender);
   resetCanvas(parseInt(els.resolution.value, 10));
   pollWorkers();
   refreshDashboard();
-  workersTimer = setInterval(() => { pollWorkers(); refreshDashboard(); }, 1500);
+  refreshMetrics();
+  workersTimer = setInterval(() => { pollWorkers(); refreshDashboard(); refreshMetrics(); }, 1500);
 })();

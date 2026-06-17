@@ -250,6 +250,24 @@ def dashboard() -> dict:
         raise HTTPException(status_code=503, detail=f"cannot read dashboard service: {exc}")
 
 
+@app.get("/metrics-link")
+def metrics_link() -> dict:
+    """URL of the Cloud Monitoring dashboard (set by deploy into the ray-links
+    ConfigMap). Null if metrics/GMP weren't wired up."""
+    try:
+        from kubernetes import client, config
+
+        try:
+            config.load_incluster_config()
+        except Exception:
+            config.load_kube_config()
+        v1 = client.CoreV1Api()
+        cm = v1.read_namespaced_config_map("ray-links", POD_NAMESPACE)
+        return {"url": (cm.data or {}).get("metrics_url")}
+    except Exception:
+        return {"url": None}
+
+
 @app.get("/workers")
 def workers() -> dict:
     """List Ray pods for the cluster map (head + autoscaled workers)."""

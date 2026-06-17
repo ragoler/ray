@@ -5,6 +5,8 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+logs/
+*.log
 
 # Local env / secrets (keep .env.example tracked)
 .env

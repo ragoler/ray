@@ -145,4 +145,23 @@ done
 DASH_IP=$(kubectl -n "${NAMESPACE}" get svc ray-dashboard -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
 [ -n "${DASH_IP}" ] && echo "  Ray Dashboard: http://${DASH_IP}/" \
   || echo "  Ray Dashboard: provisioning (kubectl -n ${NAMESPACE} get svc ray-dashboard)"
+
+echo "=== Cloud Monitoring dashboard (Ray metrics via GMP) ==="
+DASH_TITLE="Ray Render Farm"
+MON_NAME=$(gcloud monitoring dashboards list --project="${PROJECT_ID}" \
+  --filter="displayName=\"${DASH_TITLE}\"" --format="value(name)" 2>/dev/null | head -1)
+if [ -z "${MON_NAME}" ]; then
+  MON_NAME=$(gcloud monitoring dashboards create --project="${PROJECT_ID}" \
+    --config-from-file="${ROOT}/monitoring/ray-dashboard.json" --format="value(name)" 2>/dev/null || true)
+fi
+if [ -n "${MON_NAME}" ]; then
+  METRICS_URL="https://console.cloud.google.com/monitoring/dashboards/builder/${MON_NAME##*/}?project=${PROJECT_ID}"
+  echo "  Metrics dashboard: ${METRICS_URL}"
+  # Stash the URL so the controller can surface it as the playroom "Metrics" link.
+  kubectl -n "${NAMESPACE}" create configmap ray-links \
+    --from-literal=metrics_url="${METRICS_URL}" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+else
+  echo "  (could not create/find the Cloud Monitoring dashboard; skipping)"
+fi
 echo "=== Done. Run ./verify_setup.sh to smoke-test. ==="
