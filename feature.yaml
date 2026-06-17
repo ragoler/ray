@@ -21,7 +21,7 @@ paths:
 deployment_name: ray-controller-deployment
 gateway:
   name: ray-gateway
-  class: gke-l7-global-external-managed   # supports HTTPRoute URLRewrite filters
+  class: gke-l7-gxlb   # filter-free route; dashboard via its own LoadBalancer
 
 # Single image: Ray runtime + the tile task module + the FastAPI controller.
 # Used for the controller Deployment AND the RayCluster head/worker pods, so the

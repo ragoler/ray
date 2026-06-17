@@ -59,16 +59,27 @@ echo "=== Deploying per-namespace infra into: ${NAMESPACE} ==="
 # warning on pre-existing namespaces like "default").
 kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${NAMESPACE}"
 
-# Recreate the Gateway + HTTPRoute together when needed. gatewayClassName is
-# immutable, and recreating the Gateway alone while re-applying an unchanged
-# HTTPRoute leaves the route's status stale -> the Gateway never programs. So
-# whenever we recreate the Gateway, recreate the route too (fresh reconcile).
+# Force-delete the Gateway, stripping a stuck finalizer if its controller never
+# adopted it (e.g. after a class migration left it wedged "Waiting for
+# controller"). Safe here: a wedged Gateway has no GCP resources to orphan.
+force_delete_gateway() {
+  local gw="$1"
+  kubectl -n "${NAMESPACE}" get gateway "${gw}" >/dev/null 2>&1 || return 0
+  kubectl -n "${NAMESPACE}" delete gateway "${gw}" --ignore-not-found --timeout=60s && return 0
+  echo "Gateway delete is stuck; removing finalizer..."
+  kubectl -n "${NAMESPACE}" patch gateway "${gw}" --type=merge -p '{"metadata":{"finalizers":null}}' || true
+  kubectl -n "${NAMESPACE}" wait --for=delete "gateway/${gw}" --timeout=60s || true
+}
+
+# Recreate the Gateway + HTTPRoute together when the class changed (gatewayClassName
+# is immutable) or on --reset-gateway. Recreate the route too, else its status
+# stays stale and the new Gateway never programs.
 DESIRED_GW_CLASS=$(grep -m1 'gatewayClassName:' "${ROOT}/infra/gateway.yaml" | awk '{print $2}')
 CUR_GW_CLASS=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.spec.gatewayClassName}' 2>/dev/null || true)
 if [ "${RESET_GW}" = true ] || { [ -n "${CUR_GW_CLASS}" ] && [ "${CUR_GW_CLASS}" != "${DESIRED_GW_CLASS}" ]; }; then
   echo "Recreating Gateway + HTTPRoute for a clean reconcile (its IP will change)."
   kubectl -n "${NAMESPACE}" delete httproute ray-route --ignore-not-found
-  kubectl -n "${NAMESPACE}" delete gateway "${GATEWAY_NAME}" --ignore-not-found
+  force_delete_gateway "${GATEWAY_NAME}"
 fi
 
 # Variables the infra manifests reference.
@@ -88,11 +99,14 @@ for i in {1..30}; do
   GATEWAY_IP=$(kubectl -n "${NAMESPACE}" get gateway "${GATEWAY_NAME}" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
   if [ -n "${GATEWAY_IP}" ]; then
     echo "Gateway IP: ${GATEWAY_IP}"
-    echo "  Demo API:      http://${GATEWAY_IP}/healthz"
-    echo "  Ray Dashboard: http://${GATEWAY_IP}/ray-dashboard"
+    echo "  Demo API:  http://${GATEWAY_IP}/healthz"
     break
   fi
   sleep 10
 done
 [ -z "${GATEWAY_IP:-}" ] && echo "Gateway IP not ready yet; check: kubectl -n ${NAMESPACE} get gateway ${GATEWAY_NAME}"
+
+DASH_IP=$(kubectl -n "${NAMESPACE}" get svc ray-dashboard -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+[ -n "${DASH_IP}" ] && echo "  Ray Dashboard: http://${DASH_IP}/" \
+  || echo "  Ray Dashboard: provisioning (kubectl -n ${NAMESPACE} get svc ray-dashboard)"
 echo "=== Done. Run ./verify_setup.sh to smoke-test. ==="

@@ -85,7 +85,8 @@ def test_no_hardcoded_default_namespace():
                 assert ns == "${NAMESPACE}", f"{path.name}: hardcoded namespace {ns}"
 
 
-def test_httproute_backends_and_dashboard_route():
+def test_httproute_is_filter_free_to_controller():
+    """gke-l7-gxlb rejects rule filters, so the route must be filter-free."""
     route = None
     for doc in yaml.safe_load_all((INFRA / "http-route.yaml").read_text()):
         if doc and doc.get("kind") == "HTTPRoute":
@@ -96,12 +97,22 @@ def test_httproute_backends_and_dashboard_route():
         for rule in route["spec"]["rules"]
         for b in rule.get("backendRefs", [])
     }
-    assert "ray-controller" in backends
-    assert "ray-render-farm-head-svc" in backends  # dashboard route
-    # Dashboard rule rewrites the prefix to '/'.
-    dash = [r for r in route["spec"]["rules"]
-            if any(m["path"]["value"] == "/ray-dashboard" for m in r["matches"])]
-    assert dash and dash[0]["filters"][0]["urlRewrite"]["path"]["replacePrefixMatch"] == "/"
+    assert backends == {"ray-controller"}
+    # No filters anywhere (the classic GXLB class does not support them).
+    assert all("filters" not in rule for rule in route["spec"]["rules"])
+
+
+def test_dashboard_loadbalancer_service():
+    """The Ray Dashboard is exposed via its own LoadBalancer Service on 8265."""
+    svc = None
+    for doc in yaml.safe_load_all((INFRA / "dashboard-service.yaml").read_text()):
+        if doc and doc.get("kind") == "Service":
+            svc = doc
+    assert svc is not None
+    assert svc["metadata"]["name"] == "ray-dashboard"
+    assert svc["spec"]["type"] == "LoadBalancer"
+    assert svc["spec"]["selector"]["ray.io/node-type"] == "head"
+    assert svc["spec"]["ports"][0]["targetPort"] == 8265
 
 
 def test_raycluster_autoscaling_and_spot():

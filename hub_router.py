@@ -136,8 +136,9 @@ def config_endpoint() -> dict:
             gateway_ip = _get_gateway_ip(GATEWAY_NAME, ns) if ns else _get_gateway_ip(GATEWAY_NAME)
         except Exception:
             gateway_ip = None
-    dashboard_url = f"http://{gateway_ip}/ray-dashboard" if gateway_ip else None
-    return {"mode": "LIVE", "gateway_ip": gateway_ip, "dashboard_url": dashboard_url}
+    # The Ray Dashboard has its own LoadBalancer; the playroom resolves it via the
+    # controller's /dashboard endpoint (data plane), not a gateway path.
+    return {"mode": "LIVE", "gateway_ip": gateway_ip, "dashboard_url": None}
 
 
 @router.get("/presets")

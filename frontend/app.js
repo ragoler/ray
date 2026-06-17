@@ -98,9 +98,22 @@ async function loadPresets() {
 function applyConfigUI() {
   els.mode.textContent = cfg.mode;
   els.mode.className = "badge " + (cfg.mode === "MOCK" ? "badge-mock" : "badge-live");
-  if (cfg.dashboard_url) {
-    els.dash.href = cfg.dashboard_url;
-    els.dash.hidden = false;
+}
+
+// The Ray Dashboard has its own LoadBalancer; its IP is reported by the
+// controller's /dashboard endpoint (it may be null until the LB gets an IP).
+async function refreshDashboard() {
+  if (cfg.mode === "MOCK" || !els.dash.hidden) return;
+  try {
+    const r = await fetch(`${cfg.dataBase}/dashboard`, { headers: dataHeaders() });
+    if (!r.ok) return;
+    const { url } = await r.json();
+    if (url) {
+      els.dash.href = url;
+      els.dash.hidden = false;
+    }
+  } catch (_) {
+    /* not ready yet */
   }
 }
 
@@ -265,5 +278,6 @@ els.launch.addEventListener("click", runRender);
   await loadPresets();
   resetCanvas(parseInt(els.resolution.value, 10));
   pollWorkers();
-  workersTimer = setInterval(pollWorkers, 1500);
+  refreshDashboard();
+  workersTimer = setInterval(() => { pollWorkers(); refreshDashboard(); }, 1500);
 })();

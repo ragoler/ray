@@ -183,6 +183,25 @@ def stream(job_id: str) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@app.get("/dashboard")
+def dashboard() -> dict:
+    """External URL of the Ray Dashboard LoadBalancer (null until it gets an IP)."""
+    try:
+        from kubernetes import client, config
+
+        try:
+            config.load_incluster_config()
+        except Exception:
+            config.load_kube_config()
+        v1 = client.CoreV1Api()
+        svc = v1.read_namespaced_service("ray-dashboard", POD_NAMESPACE)
+        ingress = (svc.status.load_balancer.ingress or []) if svc.status.load_balancer else []
+        ip = ingress[0].ip if ingress else None
+        return {"url": f"http://{ip}/" if ip else None}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"cannot read dashboard service: {exc}")
+
+
 @app.get("/workers")
 def workers() -> dict:
     """List Ray pods for the cluster map (head + autoscaled workers)."""

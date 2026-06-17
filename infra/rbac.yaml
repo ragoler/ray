@@ -16,6 +16,10 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
+  # Read the ray-dashboard LoadBalancer Service to report its external IP.
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

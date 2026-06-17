@@ -56,4 +56,6 @@ echo "=== Cluster map (workers endpoint) ==="
 curl -fsS "${BASE}/workers" | python3 -c "import sys,json;d=json.load(sys.stdin);print('pods:',[p['pod_name'] for p in d['pods']])"
 
 echo "=== Verification successful ==="
-echo "Open the Ray Dashboard at: ${BASE}/ray-dashboard"
+DASH_IP=$(kubectl -n "${NAMESPACE}" get svc ray-dashboard -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+[ -n "${DASH_IP}" ] && echo "Open the Ray Dashboard at: http://${DASH_IP}/" \
+  || echo "Ray Dashboard LoadBalancer still provisioning (kubectl -n ${NAMESPACE} get svc ray-dashboard)"

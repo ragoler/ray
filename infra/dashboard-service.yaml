@@ -1,0 +1,22 @@
+# Dedicated external LoadBalancer for the Ray Dashboard (and Job API) on the head
+# pod's port 8265. Served at the root path of its own IP, so the dashboard SPA
+# works without any URLRewrite (which the gke-l7-gxlb Gateway can't do anyway).
+# The controller's /dashboard endpoint reports this Service's external IP to the
+# playroom's "Open Ray Dashboard" button.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ray-dashboard
+  namespace: ${NAMESPACE}
+  labels:
+    app: ray-render-farm
+spec:
+  type: LoadBalancer
+  selector:
+    # KubeRay labels the head pod with these.
+    ray.io/cluster: ray-render-farm
+    ray.io/node-type: head
+  ports:
+    - name: dashboard
+      port: 80
+      targetPort: 8265

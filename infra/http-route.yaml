@@ -1,7 +1,8 @@
-# Two routes on the feature Gateway:
-#   /ray-dashboard/* -> the Ray head dashboard (8265), prefix stripped to /
-#   /*               -> the controller (data plane: render, SSE, workers)
-# All refs are namespace-relative so the Hub's namespace rewrite stays consistent.
+# Routes the feature Gateway to the controller (data plane: render, SSE, workers).
+# Filter-free: the classic gke-l7-gxlb class does not support HTTPRoute rule
+# filters, so the Ray dashboard is NOT routed here — it has its own LoadBalancer
+# Service (dashboard-service.yaml). All refs are namespace-relative so the Hub's
+# namespace rewrite stays consistent.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -11,22 +12,6 @@ spec:
   parentRefs:
     - name: ray-gateway
   rules:
-    # Ray Dashboard (and Job API) — served by the head on 8265. The SPA can be
-    # finicky behind a prefix; ReplacePrefixMatch rewrites /ray-dashboard -> /.
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /ray-dashboard
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /
-      backendRefs:
-        - name: ray-render-farm-head-svc
-          port: 8265
-    # Everything else -> the controller.
     - matches:
         - path:
             type: PathPrefix
