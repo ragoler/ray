@@ -56,7 +56,9 @@ for f in "${ROOT}"/infra/*.yaml; do
 done
 
 echo "=== Rolling out the controller ==="
-kubectl -n "${NAMESPACE}" rollout status deployment/ray-controller-deployment --timeout=300s || true
+# Force a fresh pull of the rebuilt image (stable per-cluster tag + Always policy).
+kubectl -n "${NAMESPACE}" rollout restart deployment/ray-controller-deployment
+kubectl -n "${NAMESPACE}" rollout status deployment/ray-controller-deployment --timeout=600s || true
 
 echo "=== Deployed. Discovering Gateway IP (may take 3-5 minutes) ==="
 for i in {1..30}; do

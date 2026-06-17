@@ -9,6 +9,8 @@ metadata:
     app: ray-controller
 spec:
   replicas: 1
+  # First rollout pulls the multi-GB Ray image; give it room before failing.
+  progressDeadlineSeconds: 900
   selector:
     matchLabels:
       app: ray-controller
@@ -21,6 +23,9 @@ spec:
       containers:
         - name: controller
           image: ${RAY_IMAGE}
+          # Stable per-cluster tag is reused across builds; Always makes a rebuild
+          # actually get pulled instead of using the node's cached image.
+          imagePullPolicy: Always
           command: ["uvicorn", "controller:app", "--host", "0.0.0.0", "--port", "8000"]
           ports:
             - containerPort: 8000
@@ -34,14 +39,20 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          # Importing Ray at startup is slow (~15-40s). The startupProbe gates the
+          # liveness/readiness probes until uvicorn is actually serving, so a slow
+          # import can't trigger a restart loop. Allows up to 5 min (60 * 5s).
+          startupProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 5
+            failureThreshold: 60
           readinessProbe:
             httpGet: { path: /healthz, port: 8000 }
-            initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             httpGet: { path: /healthz, port: 8000 }
-            initialDelaySeconds: 10
             periodSeconds: 15
           resources:
-            requests: { cpu: "250m", memory: 512Mi }
-            limits: { cpu: "1", memory: 1Gi }
+            # 1+ CPU keeps the Ray import (and renders) from being throttled.
+            requests: { cpu: "500m", memory: 512Mi }
+            limits: { cpu: "2", memory: 2Gi }

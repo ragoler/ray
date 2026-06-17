@@ -26,6 +26,7 @@ spec:
         containers:
           - name: ray-head
             image: ${RAY_IMAGE}
+            imagePullPolicy: Always   # pull rebuilds of the stable per-cluster tag
             resources:
               requests: { cpu: "1", memory: 2Gi }
               limits: { cpu: "2", memory: 4Gi }
@@ -53,6 +54,7 @@ spec:
           containers:
             - name: ray-worker
               image: ${RAY_IMAGE}
+              imagePullPolicy: Always   # pull rebuilds of the stable per-cluster tag
               # Expose the pod name to Ray tasks so each tile is attributed to
               # the pod that computed it (downward API).
               env:
