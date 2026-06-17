@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import queue
 import threading
 import time
@@ -22,7 +23,8 @@ import uuid
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from tasks import build_tile_specs, render_tile
@@ -51,6 +53,23 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Serve the playroom UI ourselves so the feature is fully functional STANDALONE
+# (the Hub serves the same UI at /<slug>/, but standalone there is no Hub). The
+# UI calls its own API same-origin (its /api/features/ray/config probe 404s here
+# and it falls back to LIVE against this origin). Mirrors the Hub static layout
+# (/static/features/ray/...) so index.html's asset paths resolve in both.
+_FRONTEND = pathlib.Path(__file__).resolve().parent / "frontend"
+if _FRONTEND.is_dir():
+    app.mount(
+        "/static/features/ray",
+        StaticFiles(directory=str(_FRONTEND)),
+        name="assets",
+    )
+
+    @app.get("/", include_in_schema=False)
+    def index():
+        return FileResponse(str(_FRONTEND / "index.html"))
 
 # In-flight jobs: job_id -> {"queue": Queue, "tiles": int, "started": float}.
 _JOBS: dict[str, dict] = {}

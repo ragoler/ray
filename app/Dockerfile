@@ -14,12 +14,14 @@ RUN pip install --no-cache-dir \
     "pillow==11.0.0" \
     "kubernetes==31.0.0"
 
-# Application code. The base image runs as the non-root `ray` user (uid 1000,
-# gid 100/users), so copy the files owned by ray — otherwise they land as root
-# and ray can't read them (uvicorn/import fails with PermissionError).
-# PYTHONPATH=/app makes `tasks` importable on the Ray workers (same image), so
-# render_tile is available cluster-wide.
-COPY --chown=ray:users tasks.py controller.py ./
+# Application code + the playroom UI. Build context is the REPO ROOT (so the
+# frontend/ dir, a sibling of app/, can be baked in for standalone UI serving).
+# The base image runs as the non-root `ray` user (uid 1000, gid 100/users), so
+# copy files owned by ray — otherwise they land as root and ray can't read them
+# (uvicorn/import fails with PermissionError). PYTHONPATH=/app makes `tasks`
+# importable on the Ray workers (same image), so render_tile is cluster-wide.
+COPY --chown=ray:users app/tasks.py app/controller.py ./
+COPY --chown=ray:users frontend ./frontend
 ENV PYTHONPATH=/app
 
 EXPOSE 8000

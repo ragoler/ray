@@ -53,7 +53,8 @@ echo "=== Authenticating Docker to ${REGION}-docker.pkg.dev ==="
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
 echo "=== Building image (linux/amd64 for GKE nodes): ${RAY_IMAGE} ==="
-docker build --platform linux/amd64 -t "${RAY_IMAGE}" -f "${ROOT}/app/Dockerfile" "${ROOT}/app"
+# Context is the repo root so the image can include both app/ and frontend/.
+docker build --platform linux/amd64 -t "${RAY_IMAGE}" -f "${ROOT}/app/Dockerfile" "${ROOT}"
 
 echo "=== Pushing image ==="
 docker push "${RAY_IMAGE}"

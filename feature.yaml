@@ -29,8 +29,10 @@ gateway:
 # Used for the controller Deployment AND the RayCluster head/worker pods, so the
 # Ray Client version on the driver always matches the cluster.
 build:
+  # Context is the feature root so the image can also bake in frontend/ (for
+  # standalone UI serving); the Dockerfile copies app/ and frontend/.
   - image: ray-render-farm
-    context: app
+    context: .
     dockerfile: app/Dockerfile
 
 template_vars:

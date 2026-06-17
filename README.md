@@ -76,6 +76,11 @@ cp .env.example .env
 ./verify_setup.sh
 ```
 
+Then open the **Gateway IP in a browser** — the controller serves the full
+playroom (canvas + cluster map) standalone, calling its own API same-origin. The
+Ray Dashboard is at the `ray-dashboard` Service's external IP (printed by the
+scripts). As a Hub feature, the Hub serves the same playroom at `/ray/` instead.
+
 Teardown (the cluster is only removed with `--delete-cluster`):
 
 ```bash
