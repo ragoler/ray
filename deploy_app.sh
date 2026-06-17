@@ -33,6 +33,10 @@ IMAGE_TAG="${IMAGE_TAG:-${CLUSTER_NAME}}"
 REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}"
 RAY_IMAGE="${REGISTRY}/ray-render-farm:${IMAGE_TAG}"
 
+# Source of truth for the gateway name is the manifest, not .env (which can drift
+# from the deployed name and make IP discovery look up the wrong gateway).
+GATEWAY_NAME=$(awk '/kind: Gateway/{f=1} f&&/^  name:/{print $2; exit}' "${ROOT}/infra/gateway.yaml")
+
 # Portable ${VAR} substitution (leaves $(VAR) downward-API refs intact).
 render() { python3 -c "import os,sys;sys.stdout.write(os.path.expandvars(open(sys.argv[1]).read()))" "$1"; }
 

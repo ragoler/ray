@@ -10,6 +10,9 @@ else
   exit 1
 fi
 NAMESPACE="${NAMESPACE:-default}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Source of truth is the manifest, not .env (which can drift from the deployed name).
+GATEWAY_NAME=$(awk '/kind: Gateway/{f=1} f&&/^  name:/{print $2; exit}' "${ROOT}/infra/gateway.yaml")
 
 echo "=== Targeting cluster ${CLUSTER_NAME} (${ZONE}) ==="
 gcloud container clusters get-credentials "${CLUSTER_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}"
