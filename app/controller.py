@@ -71,6 +71,14 @@ if _FRONTEND.is_dir():
     def index():
         return FileResponse(str(_FRONTEND / "index.html"))
 
+    @app.middleware("http")
+    async def _no_cache_ui(request, call_next):
+        # Don't let browsers serve stale playroom assets after a redeploy.
+        resp = await call_next(request)
+        if request.url.path == "/" or request.url.path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
+
 # In-flight jobs: job_id -> {"queue": Queue, "tiles": int, "started": float}.
 _JOBS: dict[str, dict] = {}
 _RAY_READY = False

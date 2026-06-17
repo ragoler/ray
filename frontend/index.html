@@ -39,24 +39,38 @@
         <select id="resolution">
           <option value="256">256 × 256 · 4 tiles</option>
           <option value="512">512 × 512 · 16 tiles</option>
-          <option value="1024" selected>1024 × 1024 · 64 tiles</option>
-          <option value="2048">2048 × 2048 · 256 tiles</option>
+          <option value="1024">1024 × 1024 · 64 tiles</option>
+          <option value="2048" selected>2048 × 2048 · 256 tiles</option>
           <option value="4096">4096 × 4096 · 1024 tiles</option>
         </select>
+        <small class="field-note">More tiles = more Ray tasks = more workers.</small>
       </label>
 
       <label>Detail (max iterations)
         <input id="max_iter" type="range" min="64" max="1000" step="32" value="256" />
         <output id="max_iter_out">256</output>
+        <small class="field-note">
+          Iterations of <code>z = z² + c</code> per pixel before a point counts as
+          "inside" the set. Higher = sharper boundary detail and more CPU per tile;
+          lower = faster but blockier.
+        </small>
       </label>
 
       <button id="launch" class="btn btn-primary">Launch render</button>
 
-      <div class="hint">
-        Crank the resolution to launch more tasks than the cluster can run at
-        once — that pending demand is what makes the KubeRay autoscaler add
-        worker pods on Spot nodes. Watch the cluster map.
-      </div>
+      <details class="how">
+        <summary>How it works</summary>
+        <ol>
+          <li>The controller (a <b>Ray driver</b>) splits the image into 128×128
+            tiles and submits <b>one Ray task per tile</b> to the cluster.</li>
+          <li>Ray spreads the tasks across <b>worker pods</b>. Too few workers →
+            tasks queue → <b>KubeRay autoscales</b>, asking GKE to add worker pods
+            on <b>Spot VMs</b> (created on demand).</li>
+          <li>Each finished tile streams back over <b>SSE</b> and is painted here,
+            tagged with the <b>pod</b> that computed it (see the cluster map).</li>
+          <li>After ~1 min idle, workers <b>scale back to zero</b>.</li>
+        </ol>
+      </details>
     </section>
 
     <!-- Canvas ----------------------------------------------------------- -->
