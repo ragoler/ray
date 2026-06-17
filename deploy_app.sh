@@ -93,8 +93,19 @@ for f in "${ROOT}"/infra/*.yaml; do
   render "$f" | kubectl apply -n "${NAMESPACE}" -f -
 done
 
+echo "=== Restarting Ray pods to pick up the latest image ==="
+# KubeRay does NOT recreate head/worker pods when the RayCluster spec is re-applied,
+# so the head would keep running a stale image (and stale task code). Delete the Ray
+# pods; KubeRay recreates the head (imagePullPolicy: Always pulls the rebuild).
+# Workers are autoscaled from 0, so there are usually none to delete.
+kubectl -n "${NAMESPACE}" delete pod -l ray.io/cluster=ray-render-farm --ignore-not-found
+sleep 10
+kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
+  -l ray.io/cluster=ray-render-farm,ray.io/node-type=head --timeout=300s || true
+
 echo "=== Rolling out the controller ==="
 # Force a fresh pull of the rebuilt image (stable per-cluster tag + Always policy).
+# After the head restart so the controller's Ray Client connects to the new head.
 kubectl -n "${NAMESPACE}" rollout restart deployment/ray-controller-deployment
 kubectl -n "${NAMESPACE}" rollout status deployment/ray-controller-deployment --timeout=600s || true
 
