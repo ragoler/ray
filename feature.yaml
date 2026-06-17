@@ -1,0 +1,50 @@
+# Showcase feature descriptor — see gke_all /feature.md for the full contract.
+name: ray
+title: Distributed Compute with Ray (KubeRay)
+description: >-
+  Render the Mandelbrot set as a distributed Ray job and watch KubeRay autoscale
+  worker pods across Spot nodes in real time — tiles painting in, pods spinning
+  up, results streaming back, with a live link to the Ray Dashboard.
+gke_features:
+  - KubeRay Operator
+  - RayCluster Autoscaling
+  - Spot VMs / ComputeClass
+  - Distributed Task Fan-out
+
+paths:
+  infra_dir: infra
+  cluster_dir: cluster
+  frontend_dir: frontend
+  playroom_slug: ray
+
+# Hub polls this Deployment for readiness (ready_replicas == replicas).
+deployment_name: ray-controller-deployment
+gateway:
+  name: ray-gateway
+  class: gke-l7-gxlb
+
+# Single image: Ray runtime + the tile task module + the FastAPI controller.
+# Used for the controller Deployment AND the RayCluster head/worker pods, so the
+# Ray Client version on the driver always matches the cluster.
+build:
+  - image: ray-render-farm
+    context: app
+    dockerfile: app/Dockerfile
+
+template_vars:
+  - NAMESPACE
+  - PROJECT_NAME
+  - REGION
+  - ARTIFACT_REGISTRY_REPO
+
+# Values the Hub does not supply. Standalone defaults; Hub-standard vars win.
+template_defaults:
+  NAMESPACE: default
+  # Image reference assembled from Hub-standard vars; overridable standalone.
+  RAY_IMAGE: "${REGION}-docker.pkg.dev/${PROJECT_NAME}/${ARTIFACT_REGISTRY_REPO}/ray-render-farm:latest"
+  # RayCluster worker autoscaling bounds (the live "worker cap").
+  WORKER_MIN_REPLICAS: "0"
+  WORKER_MAX_REPLICAS: "6"
+
+# This feature's own data-plane router, mounted by the Hub at /api/features/ray.
+hub_router: "hub_router:router"

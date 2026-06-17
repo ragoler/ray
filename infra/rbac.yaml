@@ -1,0 +1,32 @@
+# Lets the controller list Ray pods in its own namespace to draw the cluster map.
+# Namespaced (no hardcoded "default"); the Hub rewrites the namespace + binding
+# subject. The admin SA may bind/escalate, so shipping RBAC is fine.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ray-controller
+  namespace: ${NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ray-controller-pod-reader
+  namespace: ${NAMESPACE}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ray-controller-pod-reader
+  namespace: ${NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ray-controller-pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: ray-controller
+    namespace: ${NAMESPACE}

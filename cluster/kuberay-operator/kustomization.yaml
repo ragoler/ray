@@ -1,0 +1,9 @@
+# KubeRay operator + CRDs, pinned to a release. Because this directory has a
+# kustomization.yaml, the Hub installs it with `kubectl apply -k` at bootstrap
+# (build_infra.sh), once per cluster. The operator is cluster-scoped and watches
+# RayCluster CRs across all feature namespaces — it is NOT deployed per feature.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - "github.com/ray-project/kuberay/ray-operator/config/default?ref=v1.2.2"

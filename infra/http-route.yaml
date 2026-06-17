@@ -1,0 +1,36 @@
+# Two routes on the feature Gateway:
+#   /ray-dashboard/* -> the Ray head dashboard (8265), prefix stripped to /
+#   /*               -> the controller (data plane: render, SSE, workers)
+# All refs are namespace-relative so the Hub's namespace rewrite stays consistent.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ray-route
+  namespace: ${NAMESPACE}
+spec:
+  parentRefs:
+    - name: ray-gateway
+  rules:
+    # Ray Dashboard (and Job API) — served by the head on 8265. The SPA can be
+    # finicky behind a prefix; ReplacePrefixMatch rewrites /ray-dashboard -> /.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ray-dashboard
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: ray-render-farm-head-svc
+          port: 8265
+    # Everything else -> the controller.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: ray-controller
+          port: 80

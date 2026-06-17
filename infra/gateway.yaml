@@ -1,0 +1,16 @@
+# Decentralized gateway — the feature ships its own. metadata.name MUST match
+# feature.yaml `gateway.name`.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: ray-gateway
+  namespace: ${NAMESPACE}
+spec:
+  gatewayClassName: gke-l7-gxlb
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same

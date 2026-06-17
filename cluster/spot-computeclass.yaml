@@ -1,0 +1,23 @@
+# Spot ComputeClass for Ray workers. Cluster-scoped: a ComputeClass found here
+# (or even under infra/) is routed to the cluster-scoped API by the Hub. Worker
+# pods select it via nodeSelector cloud.google.com/compute-class: ray-spot, so
+# the autoscaler grows the cluster onto cheap, preemptible Spot capacity.
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: ray-spot
+spec:
+  priorities:
+    - machineFamily: n2
+      spot: true
+    - machineFamily: n2d
+      spot: true
+    - machineFamily: e2
+      spot: true
+  # Let GKE create Spot node pools on demand and scale them back to zero.
+  nodePoolAutoCreation:
+    enabled: true
+  # Prefer waiting for Spot rather than silently falling back to on-demand.
+  whenUnsatisfiable: ScaleUpAnyway
+  activeMigration:
+    optimizeRulePriority: true

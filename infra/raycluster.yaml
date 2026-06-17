@@ -1,0 +1,65 @@
+# RayCluster: a head pod + an autoscaling worker group on Spot nodes.
+# The KubeRay operator (cluster-scoped, installed once via cluster/) reconciles
+# this into pods. enableInTreeAutoscaling makes pending task demand grow the
+# worker group between WORKER_MIN_REPLICAS and WORKER_MAX_REPLICAS — that is the
+# autoscaling the demo visualizes.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray-render-farm
+  namespace: ${NAMESPACE}
+  labels:
+    app: ray-render-farm
+spec:
+  rayVersion: "2.40.0"
+  enableInTreeAutoscaling: true
+  autoscalerOptions:
+    idleTimeoutSeconds: 60          # drain idle workers ~1 min after a render
+    upscalingMode: Default
+
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: "0.0.0.0"     # serve the dashboard for the Gateway route
+      num-cpus: "0"                 # keep tasks on workers so fan-out is visible
+    template:
+      spec:
+        containers:
+          - name: ray-head
+            image: ${RAY_IMAGE}
+            resources:
+              requests: { cpu: "1", memory: 2Gi }
+              limits: { cpu: "2", memory: 4Gi }
+            ports:
+              - { containerPort: 6379, name: gcs }
+              - { containerPort: 8265, name: dashboard }
+              - { containerPort: 10001, name: client }
+
+  workerGroupSpecs:
+    - groupName: spot-workers
+      replicas: ${WORKER_MIN_REPLICAS}
+      minReplicas: ${WORKER_MIN_REPLICAS}
+      maxReplicas: ${WORKER_MAX_REPLICAS}
+      rayStartParams: {}
+      template:
+        spec:
+          # Land workers on Spot capacity via the cluster-scoped ComputeClass.
+          nodeSelector:
+            cloud.google.com/compute-class: ray-spot
+          tolerations:
+            - key: cloud.google.com/gke-spot
+              operator: Equal
+              value: "true"
+              effect: NoSchedule
+          containers:
+            - name: ray-worker
+              image: ${RAY_IMAGE}
+              # Expose the pod name to Ray tasks so each tile is attributed to
+              # the pod that computed it (downward API).
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+              resources:
+                requests: { cpu: "1", memory: 2Gi }
+                limits: { cpu: "2", memory: 4Gi }

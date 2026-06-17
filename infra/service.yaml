@@ -1,0 +1,15 @@
+# Stable Service name shared by the HTTPRoute backend and any hub_router target.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ray-controller
+  namespace: ${NAMESPACE}
+  labels:
+    app: ray-controller
+spec:
+  selector:
+    app: ray-controller
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

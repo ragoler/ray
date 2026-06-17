@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ray Render Farm — KubeRay on GKE</title>
+  <link rel="stylesheet" href="/static/features/ray/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🌀</span>
+      <div>
+        <h1>Ray Render Farm</h1>
+        <p class="subtitle">Distributed Mandelbrot rendering on KubeRay · GKE</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="mode-badge" class="badge badge-mock">…</span>
+      <a id="dashboard-btn" class="btn btn-ghost" target="_blank" rel="noopener" hidden>
+        Open Ray Dashboard ↗
+      </a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Controls --------------------------------------------------------- -->
+    <section class="panel controls">
+      <h2>Render</h2>
+
+      <label>Region
+        <select id="preset"></select>
+      </label>
+
+      <label>Resolution
+        <select id="resolution">
+          <option value="256">256 × 256 · 4 tiles</option>
+          <option value="512">512 × 512 · 16 tiles</option>
+          <option value="1024" selected>1024 × 1024 · 64 tiles</option>
+          <option value="2048">2048 × 2048 · 256 tiles</option>
+          <option value="4096">4096 × 4096 · 1024 tiles</option>
+        </select>
+      </label>
+
+      <label>Detail (max iterations)
+        <input id="max_iter" type="range" min="64" max="1000" step="32" value="256" />
+        <output id="max_iter_out">256</output>
+      </label>
+
+      <button id="launch" class="btn btn-primary">Launch render</button>
+
+      <div class="hint">
+        Crank the resolution to launch more tasks than the cluster can run at
+        once — that pending demand is what makes the KubeRay autoscaler add
+        worker pods on Spot nodes. Watch the cluster map.
+      </div>
+    </section>
+
+    <!-- Canvas ----------------------------------------------------------- -->
+    <section class="panel canvas-wrap">
+      <h2>Output <span id="progress" class="muted"></span></h2>
+      <div class="canvas-frame">
+        <canvas id="canvas" width="1024" height="1024"></canvas>
+      </div>
+    </section>
+
+    <!-- Cluster map + stats ---------------------------------------------- -->
+    <section class="panel cluster">
+      <h2>Cluster <span id="worker-count" class="muted"></span></h2>
+      <div id="pods" class="pods"></div>
+
+      <h3>Stats</h3>
+      <ul class="stats">
+        <li><span>Tiles</span><b id="stat-tiles">0 / 0</b></li>
+        <li><span>Active pods</span><b id="stat-pods">0</b></li>
+        <li><span>Throughput</span><b id="stat-tput">0 /s</b></li>
+        <li><span>Elapsed</span><b id="stat-elapsed">0.0 s</b></li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="/static/features/ray/app.js"></script>
+</body>
+</html>

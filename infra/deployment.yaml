@@ -1,0 +1,47 @@
+# The controller = the Ray driver + the demo's data-plane API. The Hub polls
+# this Deployment (name must equal feature.yaml `deployment_name`) for readiness.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ray-controller-deployment
+  namespace: ${NAMESPACE}
+  labels:
+    app: ray-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ray-controller
+  template:
+    metadata:
+      labels:
+        app: ray-controller
+    spec:
+      serviceAccountName: ray-controller
+      containers:
+        - name: controller
+          image: ${RAY_IMAGE}
+          command: ["uvicorn", "controller:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          env:
+            # Bare service name resolves within this namespace (namespace-portable).
+            - name: RAY_ADDRESS
+              value: "ray://ray-render-farm-head-svc:10001"
+            - name: RAY_CLUSTER_NAME
+              value: "ray-render-farm"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "250m", memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
