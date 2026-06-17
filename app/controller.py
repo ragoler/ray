@@ -78,18 +78,46 @@ _RAY_LOCK = threading.Lock()
 
 
 def _ensure_ray() -> None:
-    """Connect to the RayCluster lazily and once."""
+    """Ensure a LIVE Ray Client connection, reconnecting if it dropped.
+
+    The Ray Client connection can die (head restart, Spot churn, idle blip). A
+    cached "connected" flag would then make every render fail with 503, so we
+    probe liveness each time and reconnect transparently.
+    """
     global _RAY_READY
-    if _RAY_READY:
-        return
+    import ray
+
     with _RAY_LOCK:
         if _RAY_READY:
-            return
-        import ray
+            try:
+                ray.cluster_resources()  # cheap liveness probe
+                return
+            except Exception:
+                _RAY_READY = False  # connection died — fall through to reconnect
 
-        if not ray.is_initialized():
-            ray.init(address=RAY_ADDRESS, ignore_reinit_error=True)
+        try:
+            ray.shutdown()
+        except Exception:
+            pass
+        ray.init(address=RAY_ADDRESS, ignore_reinit_error=True)
+        ray.cluster_resources()  # confirm the head is actually reachable
         _RAY_READY = True
+
+
+def _mark_ray_down() -> None:
+    global _RAY_READY
+    with _RAY_LOCK:
+        _RAY_READY = False
+
+
+def _prewarm_ray() -> None:
+    """Background: connect (and keep reconnecting) so the first render is fast."""
+    while True:
+        try:
+            _ensure_ray()
+        except Exception:
+            pass
+        time.sleep(30)
 
 
 # --------------------------------------------------------------------------- #
@@ -144,6 +172,7 @@ def _run_render(job_id: str, req: RenderRequest) -> None:
                 q.put(tile)
         q.put({"type": "done", "elapsed_ms": int((time.time() - _JOBS[job_id]["started"]) * 1000)})
     except Exception as exc:  # surface failures, don't swallow them
+        _mark_ray_down()  # force a reconnect on the next render
         q.put({"type": "error", "message": str(exc)})
     finally:
         q.put(None)  # sentinel
@@ -245,3 +274,8 @@ def workers() -> dict:
         return {"namespace": POD_NAMESPACE, "cluster": RAY_CLUSTER_NAME, "pods": out}
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"cannot list pods: {exc}")
+
+
+# Connect to Ray in the background so the first render doesn't pay the cold
+# ray.init() cost, and so a dropped connection is re-established proactively.
+threading.Thread(target=_prewarm_ray, daemon=True).start()
