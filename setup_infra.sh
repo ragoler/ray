@@ -51,8 +51,9 @@ if [ "$MODE" = "delete" ] || [ "$MODE" = "delete-cluster" ]; then
   if cluster_exists; then
     gcloud container clusters get-credentials "${CLUSTER_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}"
     echo "=== Removing cluster-scoped prerequisites ==="
-    kubectl delete -f "${ROOT}/cluster/spot-computeclass.yaml" --ignore-not-found || true
-    kubectl delete -k "${ROOT}/cluster/kuberay-operator" --ignore-not-found || true
+    # Single kustomization (operator bundle + ray-system ns + Spot ComputeClass), mirroring
+    # the Hub's `apply -k cluster/`. --ignore-not-found so partial state tears down cleanly.
+    kubectl delete -k "${ROOT}/cluster" --ignore-not-found || true
   else
     echo "Cluster ${CLUSTER_NAME} does not exist; nothing to remove."
   fi
@@ -93,21 +94,18 @@ echo "=== Step 2b: Ensuring Managed Prometheus (GMP) is enabled ==="
 gcloud container clusters update "${CLUSTER_NAME}" --project="${PROJECT_ID}" --zone="${ZONE}" \
   --enable-managed-prometheus 2>/dev/null || echo "Managed Prometheus already enabled (or update skipped)."
 
-# --- Step 3: KubeRay operator (pinned kustomize) --------------------------
-echo "=== Step 3: Installing the KubeRay operator (cluster-scoped, pinned) ==="
-# The kustomization pins the operator to ray-system; kubectl apply won't create
-# the namespace, so ensure it exists first.
-kubectl get namespace ray-system >/dev/null 2>&1 || kubectl create namespace ray-system
-kubectl apply --server-side -k "${ROOT}/cluster/kuberay-operator"
+# --- Step 3: Cluster-scoped prerequisites (one kustomization) -------------
+echo "=== Step 3: Installing cluster prerequisites (KubeRay operator + ns + Spot ComputeClass) ==="
+# A single top-level kustomization composes the operator bundle, the ray-system Namespace
+# (apply -k won't create it otherwise), and the Spot ComputeClass — the exact same dir and
+# command the Hub's build_infra.sh runs, so standalone and Hub never drift. Server-side
+# apply because KubeRay's CRDs exceed the client-side 256KB annotation limit.
+kubectl apply --server-side --force-conflicts -k "${ROOT}/cluster"
 # One-time migration safeguard: an earlier KubeRay version installed the operator
 # in the default namespace. Remove any stray duplicate so exactly one operator
 # reconciles RayClusters (two would fight over creating worker pods). No-op on a
 # clean cluster.
 kubectl delete deployment kuberay-operator -n default --ignore-not-found
 kubectl -n ray-system rollout status deploy/kuberay-operator --timeout=300s || true
-
-# --- Step 4: Spot ComputeClass --------------------------------------------
-echo "=== Step 4: Applying the Spot ComputeClass for Ray workers ==="
-kubectl apply -f "${ROOT}/cluster/spot-computeclass.yaml"
 
 echo "=== Setup complete. Next: ./deploy_app.sh ==="

@@ -1,0 +1,8 @@
+# Dedicated namespace for the KubeRay operator. The operator kustomization pins itself
+# to ray-system, but `kubectl apply -k` does not create the namespace — so it is shipped
+# here as a kustomize resource. kubectl applies Namespaces before namespaced resources,
+# so the operator's objects land correctly in the same apply.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ray-system

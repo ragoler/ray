@@ -1,0 +1,18 @@
+# Cluster-scoped prerequisites for the ray feature, installed once per cluster.
+#
+# The Hub discovers a TOP-LEVEL kustomization.yaml in cluster_dir and runs
+# `kubectl apply --server-side -k cluster/` at bootstrap (build_infra.sh). The standalone
+# setup_infra.sh applies this same directory, so the two paths never drift.
+#
+# Composed here so a single apply installs everything cluster-once:
+#   - namespace.yaml        -> the ray-system Namespace (apply -k won't create it itself)
+#   - kuberay-operator/     -> the KubeRay operator + CRDs (remote bundle, pinned; this
+#                              subdir's own kustomization pins it to namespace: ray-system)
+#   - spot-computeclass.yaml-> the Spot ComputeClass the RayCluster workers schedule onto
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - kuberay-operator
+  - spot-computeclass.yaml
