@@ -28,14 +28,11 @@ from fastapi.responses import StreamingResponse
 # Shared SDK — imported tolerantly so the router also loads standalone/in tests.
 # --------------------------------------------------------------------------- #
 try:  # pragma: no cover - exercised inside the Hub container
-    from showcase_admin.app import config, k8s_client
-
-    _get_gateway_ip = getattr(k8s_client, "get_gateway_ip", None)
-    _get_feature_namespace = getattr(k8s_client, "get_feature_namespace", None)
+    from showcase_admin.app import config, database, k8s_client
 except Exception:  # standalone / unit tests
     config = None
-    _get_gateway_ip = None
-    _get_feature_namespace = None
+    database = None
+    k8s_client = None
 
 
 def _mode() -> str:
@@ -138,17 +135,24 @@ def _mock_add_worker() -> dict:
 # Endpoints
 # --------------------------------------------------------------------------- #
 @router.get("/config")
-def config_endpoint() -> dict:
+async def config_endpoint() -> dict:
     if _mode() == "MOCK":
         return {"mode": "MOCK", "gateway_ip": None, "dashboard_url": None}
 
+    # LIVE: resolve the feature's deployed namespace, then this feature's Gateway IP so the
+    # browser can reach the controller's data plane directly (CORS). get_gateway_ip is async
+    # and takes (namespace, gateway_name) — a swapped/un-awaited call here returns no IP, the
+    # frontend falls back to the Hub path, and the unauthenticated render POST 401s.
     gateway_ip = None
-    if _get_gateway_ip:
+    if database is not None and k8s_client is not None:
+        db = next(database.get_db())
         try:
-            ns = _get_feature_namespace(FEATURE) if _get_feature_namespace else None
-            gateway_ip = _get_gateway_ip(GATEWAY_NAME, ns) if ns else _get_gateway_ip(GATEWAY_NAME)
+            ns = database.get_feature_namespace(db, FEATURE)
+            gateway_ip = await k8s_client.get_gateway_ip(ns, GATEWAY_NAME)
         except Exception:
             gateway_ip = None
+        finally:
+            db.close()
     # The Ray Dashboard has its own LoadBalancer; the playroom resolves it via the
     # controller's /dashboard endpoint (data plane), not a gateway path.
     return {"mode": "LIVE", "gateway_ip": gateway_ip, "dashboard_url": None}
