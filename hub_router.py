@@ -30,15 +30,28 @@ from fastapi.responses import StreamingResponse
 try:  # pragma: no cover - exercised inside the Hub container
     from showcase_admin.app import config, k8s_client
 
-    _MODE = getattr(config, "MODE", "LIVE")
     _get_gateway_ip = getattr(k8s_client, "get_gateway_ip", None)
     _get_feature_namespace = getattr(k8s_client, "get_feature_namespace", None)
 except Exception:  # standalone / unit tests
-    import os
-
-    _MODE = os.environ.get("MODE", "MOCK")
+    config = None
     _get_gateway_ip = None
     _get_feature_namespace = None
+
+
+def _mode() -> str:
+    """Resolve the current mode *dynamically* (never cache at import).
+
+    The Hub's test harness sets ``MODE=MOCK`` after this module is imported, so a
+    value captured at import time would go stale and the mock data plane would never
+    activate. Prefer the live ``config.MODE`` when the Hub SDK is present, else the
+    ``MODE`` env var (standalone / unit tests), defaulting to MOCK.
+    """
+    if config is not None:
+        return getattr(config, "MODE", "MOCK")
+    import os
+
+    return os.environ.get("MODE", "MOCK").upper()
+
 
 FEATURE = "ray"
 GATEWAY_NAME = "ray-render-gw"
@@ -126,7 +139,7 @@ def _mock_add_worker() -> dict:
 # --------------------------------------------------------------------------- #
 @router.get("/config")
 def config_endpoint() -> dict:
-    if _MODE == "MOCK":
+    if _mode() == "MOCK":
         return {"mode": "MOCK", "gateway_ip": None, "dashboard_url": None}
 
     gateway_ip = None
@@ -149,7 +162,7 @@ def presets() -> dict:
 @router.post("/render")
 async def render(req: dict) -> dict:
     """MOCK render planner. (LIVE renders go straight to the Gateway IP.)"""
-    if _MODE != "MOCK":
+    if _mode() != "MOCK":
         raise HTTPException(
             status_code=409,
             detail="LIVE render runs on the Gateway IP, not the Hub router.",
@@ -165,7 +178,7 @@ async def render(req: dict) -> dict:
 
 @router.get("/render/{job_id}/stream")
 async def stream(job_id: str) -> StreamingResponse:
-    if _MODE != "MOCK":
+    if _mode() != "MOCK":
         raise HTTPException(status_code=409, detail="LIVE stream is on the Gateway IP.")
     job = _MOCK_JOBS.get(job_id)
     if not job:
@@ -211,7 +224,7 @@ async def stream(job_id: str) -> StreamingResponse:
 
 @router.get("/workers")
 def workers() -> dict:
-    if _MODE != "MOCK":
+    if _mode() != "MOCK":
         raise HTTPException(status_code=409, detail="LIVE workers are on the Gateway IP.")
     return {"namespace": "gke-showcase-ray", "cluster": "ray-render-farm",
             "pods": list(_MOCK_PODS)}
