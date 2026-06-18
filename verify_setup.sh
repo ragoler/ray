@@ -45,6 +45,24 @@ echo "Gateway IP: ${GATEWAY_IP}"
 
 BASE="http://${GATEWAY_IP}"
 
+# A freshly-created L7 gateway reports an IP before its backend + health checks are
+# programmed; until then requests get "connection reset"/"empty reply". Poll
+# /healthz until the data path is actually serving (up to ~8 min).
+echo "=== Waiting for the Gateway data path to be healthy ==="
+HEALTHY=""
+for i in $(seq 1 32); do
+  if curl -fsS -m 10 "${BASE}/healthz" >/dev/null 2>&1; then
+    HEALTHY=1
+    echo "Gateway healthy after ~$((i * 15))s"
+    break
+  fi
+  sleep 15
+done
+if [ -z "${HEALTHY}" ]; then
+  echo "Error: Gateway data path not healthy yet (LB still programming). Re-run ./verify_setup.sh shortly."
+  exit 1
+fi
+
 echo "=== Health check ==="
 curl -fsS "${BASE}/healthz" && echo
 
